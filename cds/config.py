@@ -40,7 +40,9 @@ from invenio_opendefinition.config import OPENDEFINITION_REST_ENDPOINTS
 from invenio_records_rest.facets import range_filter, terms_filter
 
 from .modules.deposit.facets import created_by_me_aggs
+
 from .modules.deposit.indexer import CDSRecordIndexer
+
 from .modules.records.permissions import (deposit_delete_permission_factory,
                                           deposit_read_permission_factory,
                                           deposit_update_permission_factory,
@@ -64,7 +66,7 @@ CDS_ENV_TEST = False
 #: Email address for admins.
 CDS_ADMIN_EMAIL = "cds-admin@cern.ch"
 #: Email address for no-reply.
-NOREPLY_EMAIL = "no-reply@cern.ch"
+NOREPLY_EMAIL = "cds-no-reply@cern.ch"
 MAIL_SUPPRESS_SEND = True
 
 ###############################################################################
@@ -138,6 +140,7 @@ CELERYBEAT_SCHEDULE = {
         'task': 'cds.modules.records.tasks.file_integrity_report',
         'schedule': crontab(minute=0, hour=7),  # Every day at 07:00 UTC
     },
+
     'subformats-integrity-report': {
         'task': 'cds.modules.records.tasks.subformats_integrity_report',
         # Every 2 days at 04:00 UTC
@@ -148,6 +151,7 @@ CELERYBEAT_SCHEDULE = {
         # Every Monday morning at 05:30 UTC
         'schedule': crontab(hour=5, minute=30, day_of_week=1),
     },
+
 }
 
 ###############################################################################

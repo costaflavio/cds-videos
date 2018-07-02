@@ -26,6 +26,7 @@
 from __future__ import absolute_import, print_function
 
 import json
+
 from datetime import datetime, timedelta
 import requests
 import sqlalchemy as sa
@@ -47,6 +48,7 @@ from invenio_records_files.models import RecordsBuckets
 from requests.exceptions import RequestException
 
 from .api import CDSRecord, Keyword
+
 from .search import KeywordSearch, query_to_objects
 
 # from .symlinks import SymlinksCreator
@@ -54,10 +56,12 @@ from .search import KeywordSearch, query_to_objects
 
 def _get_keywords_from_api(url):
     """Get keywords list from API."""
+
     request = requests.get(
         url, headers={
             'User-Agent': current_app.config.get('RECORDS_ID_PROVIDER_AGENT')
         }).text
+
 
     keywords = {}
     for tag in json.loads(request)['tags']:
@@ -211,9 +215,11 @@ def format_file_integrity_report(report):
                                 entry['record'].get('recid'))))
         if 'deposit' in entry:
             lines.append(u'Deposit: {}'.format(
+
                 format_pid_link(
                     current_app.config['DEPOSIT_UI_ENDPOINT_DEFAULT'],
                     entry['deposit'].get('_deposit', {}).get('id'))))
+
         lines.append(('-' * 80) + '\n')
     return '\n'.join(lines)
 
@@ -260,6 +266,7 @@ def file_integrity_report():
         body = format_file_integrity_report(report)
         sender = current_app.config['NOREPLY_EMAIL']
         recipients = [current_app.config['CDS_ADMIN_EMAIL']]
+
         _send_email(subject, body, sender, recipients)
 
 
@@ -463,3 +470,4 @@ def missing_subformats_report(start_date=None, end_date=None):
         sender = current_app.config['NOREPLY_EMAIL']
         recipients = [current_app.config['CDS_ADMIN_EMAIL']]
         _send_email(subject, body, sender, recipients)
+

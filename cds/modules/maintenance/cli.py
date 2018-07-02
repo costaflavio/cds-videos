@@ -32,9 +32,11 @@ from flask.cli import with_appcontext
 
 from cds.modules.maintenance.subformats import create_all_missing_subformats, \
     create_all_subformats, create_subformat
+
 from invenio_db import db
 from invenio_files_rest.models import ObjectVersion, ObjectVersionTag
 from invenio_records_files.models import RecordsBuckets
+
 
 
 def abort_if_false(ctx, param, value):
@@ -58,6 +60,7 @@ def missing(recid, depid):
 
     value = recid or depid
     type = 'recid' if recid else 'depid'
+
     output, task_id = create_all_missing_subformats(id_type=type,
                                                     id_value=value)
     if output:
@@ -66,6 +69,7 @@ def missing(recid, depid):
                 output, task_id))
     else:
         click.echo("No missing subformats to create.")
+
 
 
 @subformats.group()
@@ -91,12 +95,14 @@ def quality(recid, depid, quality):
         raise ClickException(
             "Input quality must be one of {0}".format(qualities))
 
+
     output, task_id = create_subformat(id_type=type, id_value=value,
                                        quality=quality)
     if output:
         click.echo(
             "Creating the following subformat: {0}. Task id: {1}".format(
                 output, task_id))
+
     else:
         click.echo("This subformat cannot be transcoded.")
 
@@ -207,3 +213,4 @@ def extract_frames(recid, depid):
 
     ExtractFramesTask().si(version_id=master['version_id'],
                            deposit_id=depid).apply_async()
+

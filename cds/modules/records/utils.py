@@ -27,11 +27,14 @@
 from __future__ import absolute_import, print_function
 
 from flask import current_app, g, request
+
 from six.moves.html_parser import HTMLParser
 from six.moves.urllib.parse import urlparse
 
 from invenio_search import current_search
 from invenio_search.utils import schema_to_index
+from six.moves.html_parser import HTMLParser
+from six.moves.urllib.parse import urlparse
 
 
 def schema_prefix(schema):

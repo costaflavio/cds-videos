@@ -101,6 +101,7 @@ install_requires = [
     'invenio-communities>=1.0.0a19',
     'invenio-config>=1.0.0',
     'invenio-db[postgresql,versioning]>=1.0.0',
+
     # FIXME topical branch
     #  'invenio-deposit>=1.0.0a8',
     # FIXME topical branch
@@ -117,6 +118,7 @@ install_requires = [
     'invenio-oaiserver>=1.0.0',
     'invenio-oauth2server>=1.0.0',
     'invenio-oauthclient>=1.0.0',
+
     'invenio-opendefinition>=1.0.0a7',
     'invenio-pages>=1.0.0a4',
     'invenio-pidstore>=1.0.0',
@@ -128,6 +130,7 @@ install_requires = [
     'invenio-rest>=1.0.0',
     'invenio-search-ui>=1.0.1',
     'invenio-search[elasticsearch2]>=1.0.0',
+
     'invenio-sequencegenerator>=1.0.0a2',
     'invenio-theme>=1.0.0',
     'invenio-userprofiles>=1.0.0',
@@ -143,8 +146,10 @@ install_requires = [
     'elasticsearch<3.0.0,>=2.0.0',      # FIXME: invenio-search
     'elasticsearch-dsl<3.0.0,>=2.0.0',  # FIXME: invenio-search
     'node-semver>=0.1.1,<0.2.0',        # FIXME: node-semver 0.2.0
+
     'urllib3[secure]>=1.22',            # urllib3 doesn't install pyOpenSSl by default and thus the [secure] extra is needed
     'SQLAlchemy-Continuum==1.3.4'       # FIXME: issue https://github.com/kvesteri/sqlalchemy-continuum/issues/188
+
 ]
 
 packages = find_packages()
@@ -174,7 +179,9 @@ setup(
         ],
         'flask.commands': [
             'subformats = cds.modules.maintenance.cli:subformats',
+
             'videos = cds.modules.maintenance.cli:videos',
+
         ],
         'invenio_admin.views': [
             'cds_admin = '

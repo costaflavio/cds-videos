@@ -18,9 +18,11 @@
           {% endif %}
         },
         isEmbeddable: true,
+
         {% if embed_config.autoplay %}
         mutedAutoplay: 'all',
         {% endif %}
+
         initialRendition: 'first'
       });
       // Preload

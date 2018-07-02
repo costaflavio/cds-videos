@@ -47,9 +47,11 @@ def create_all_missing_subformats(id_type, id_value):
         filter(lambda q: can_be_transcoded(q, ar, w, h), missing))
 
     # sequential (and immutable) transcoding to avoid MergeConflicts on bucket
+
     task_id = None
     if transcodables:
         task_id = chain([
+
             MaintenanceTranscodeVideoTask().si(
                 version_id=master['version_id'],
                 preset_quality=quality,
@@ -57,6 +59,7 @@ def create_all_missing_subformats(id_type, id_value):
             ) for quality in transcodables]).apply_async()
 
     return transcodables, task_id
+
 
 
 def create_subformat(id_type, id_value, quality):
@@ -67,15 +70,19 @@ def create_subformat(id_type, id_value, quality):
     master, ar, w, h = _get_master_video(video_deposit)
 
     subformat = can_be_transcoded(quality, ar, w, h)
+
     task_id = None
     if subformat:
         task_id = MaintenanceTranscodeVideoTask().s(
+
             version_id=master['version_id'],
             preset_quality=subformat['quality'],
             deposit_id=dep_uuid
         ).apply_async()
 
+
     return subformat, task_id
+
 
 
 def create_all_subformats(id_type, id_value):
@@ -89,9 +96,11 @@ def create_all_subformats(id_type, id_value):
                                 get_all_distinct_qualities()))
 
     # sequential (and immutable) transcoding to avoid MergeConflicts on bucket
+<
     task_id = None
     if transcodables:
         task_id = chain([
+
             MaintenanceTranscodeVideoTask().si(
                 version_id=master['version_id'],
                 preset_quality=quality,
@@ -99,17 +108,21 @@ def create_all_subformats(id_type, id_value):
             )
             for quality in transcodables]).apply_async()
 
+
     return transcodables, task_id
+
 
 
 def _resolve_deposit(id_type, id_value):
     """Return the deposit video."""
+
     depid = id_value
     if id_type == 'recid':
         _, record = record_resolver.resolve(id_value)
         depid = record['_deposit']['id']
 
     return deposit_video_resolver(depid), depid
+
 
 
 def _get_master_video(video_deposit):
