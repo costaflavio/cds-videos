@@ -40,13 +40,17 @@ from invenio_opendefinition.config import OPENDEFINITION_REST_ENDPOINTS
 from invenio_records_rest.facets import range_filter, terms_filter
 
 from .modules.deposit.facets import created_by_me_aggs
+
+from .modules.deposit.indexer import CDSRecordIndexer
+
 from .modules.records.permissions import (deposit_delete_permission_factory,
                                           deposit_read_permission_factory,
                                           deposit_update_permission_factory,
                                           record_create_permission_factory,
                                           record_read_permission_factory,
                                           record_update_permission_factory)
-from .modules.records.search import NotDeletedKeywordSearch, RecordVideosSearch
+from .modules.records.search import (NotDeletedKeywordSearch,
+                                     RecordVideosSearch, lowercase_filter)
 
 
 # Identity function for string extraction
@@ -136,6 +140,18 @@ CELERYBEAT_SCHEDULE = {
         'task': 'cds.modules.records.tasks.file_integrity_report',
         'schedule': crontab(minute=0, hour=7),  # Every day at 07:00 UTC
     },
+
+    'subformats-integrity-report': {
+        'task': 'cds.modules.records.tasks.subformats_integrity_report',
+        # Every 2 days at 04:00 UTC
+        'schedule': crontab(minute=0, hour=4, day_of_week=[0, 2, 4, 6]),
+    },
+    'missing-subformats-report': {
+        'task': 'cds.modules.records.tasks.missing_subformats_report',
+        # Every Monday morning at 05:30 UTC
+        'schedule': crontab(hour=5, minute=30, day_of_week=1),
+    },
+
 }
 
 ###############################################################################
@@ -177,6 +193,8 @@ DEBUG_TB_INTERCEPT_REDIRECTS = False
 
 # Search API endpoint.
 SEARCH_UI_SEARCH_API = '/api/records/'
+# Name of the search index used.
+SEARCH_UI_SEARCH_INDEX = 'records-videos-video'
 # Default template for search UI.
 SEARCH_UI_SEARCH_TEMPLATE = 'cds_search_ui/search.html'
 # Default base template for search UI
@@ -187,10 +205,18 @@ SEARCH_UI_SEARCH_EXTRA_PARAMS = {
 }
 # Default Elasticsearch document type.
 SEARCH_DOC_TYPE_DEFAULT = None
+
+# Legacy host Elasticsearch
+LEGACY_STATS_ELASTIC_HOST = '127.0.0.1'
+# Legacy port Elasticsearch
+LEGACY_STATS_ELASTIC_PORT = 9199
+# Default port Elasticsearch
+
 # Do not map any keywords.
 SEARCH_ELASTIC_KEYWORD_MAPPING = {}
 # SEARCH UI JS TEMPLATES
 # SEARCH_UI_JSTEMPLATE_RESULTS = 'templates/cds_search_ui/results.html'
+SEARCH_UI_JSTEMPLATE_ERROR = 'templates/cds_search_ui/error.html'
 
 # Angular template for featured
 SEARCH_UI_VIDEO_FEATURED = 'templates/cds/video/featured.html'
@@ -295,8 +321,7 @@ RECORDS_UI_ENDPOINTS = dict(
     recid_export=dict(
         pid_type='recid',
         route='/record/<pid_value>/export/<any({0}):format>'.format(
-            ", ".join(list(CDS_RECORDS_EXPORTFORMATS.keys()))
-        ),
+            ", ".join(list(CDS_RECORDS_EXPORTFORMATS.keys()))),
         template='cds_records/record_export.html',
         view_imp='cds.modules.records.views.records_ui_export',
         record_class='cds.modules.records.api:CDSRecord',
@@ -308,6 +333,8 @@ RECORDS_UI_ENDPOINT = '{scheme}://{host}/record/{pid_value}'
 
 # OAI Server.
 OAISERVER_ID_PREFIX = 'oai:cds.cern.ch:'
+# Relative URL to XSL Stylesheet, placed under `modules/records/static`.
+OAISERVER_XSL_URL= '/static/xsl/oai2.xsl'
 OAISERVER_RECORD_INDEX = 'records'
 
 # 404 template.
@@ -325,7 +352,7 @@ RECORDS_REST_ENDPOINTS = dict(
         pid_type='recid',
         pid_minter='cds_recid',
         pid_fetcher='cds_recid',
-        indexer_class=None,
+        indexer_class=CDSRecordIndexer,
         search_type=None,
         search_class=RecordVideosSearch,
         search_factory_imp='invenio_records_rest.query.es_search_factory',
@@ -364,7 +391,7 @@ RECORDS_REST_ENDPOINTS = dict(
         pid_type='catid',
         pid_minter='cds_catid',
         pid_fetcher='cds_catid',
-        indexer_class=None,
+        indexer_class=CDSRecordIndexer,
         search_index='categories',
         search_type=None,
         search_class=RecordVideosSearch,
@@ -395,7 +422,7 @@ RECORDS_REST_ENDPOINTS = dict(
         pid_type='kwid',
         pid_minter='cds_kwid',
         pid_fetcher='cds_kwid',
-        indexer_class=None,
+        indexer_class=CDSRecordIndexer,
         search_index='keywords',
         search_type=None,
         search_class=NotDeletedKeywordSearch,
@@ -437,16 +464,24 @@ RECORDS_REST_SORT_OPTIONS = {
             'order': 1,
         },
         'mostrecent': {
-            'title': 'Most recent',
-            'fields': ['-_created'],
-            'default_order': 'asc',
-            'order': 2,
+            'title': 'Newest',
+            'fields': ['-date'],
+            'default_order': 'asc', 'order': 2,
         },
-        'publication_date': {
-            'title': 'Publication date',
-            'fields': ['publication_date'],
-            'default_order': 'desc',
-            'order': 3,
+        'oldest': {
+            'title': 'Oldest',
+            'fields': ['date'],
+            'default_order': 'asc', 'order': 3,
+        },
+        'title_asc': {
+            'title': 'Title [Asc]',
+            'fields': ['title.title'],
+            'default_order': 'asc', 'order': 4,
+        },
+        'title_desc': {
+            'title': 'Title [Desc]',
+            'fields': ['title.title'],
+            'default_order': 'desc', 'order': 5,
         }
     }
 }
@@ -459,7 +494,7 @@ RECORDS_REST_DEFAULT_SORT = {
     },
     'deposits-records-videos-project': {
         'query': 'bestmatch',
-        'noquery': 'mostrecent',
+        'noquery': 'mostrecent_created',
     }
 }
 
@@ -485,25 +520,25 @@ RECORD_UI_ENDPOINT = '{scheme}://{host}/record/{pid_value}'
 DEPOSIT_PROJECT_FACETS = {
     'deposits-records-videos-project': {
         'aggs': {
-            'status': {
+            'project_status': {
                 'terms': {'field': '_deposit.status'},
             },
             'category': {
                 'terms': {'field': 'category.untouched'},
             },
-            'transcode': {
+            'task_transcode': {
                 'terms': {'field': '_cds.state.file_transcode'},
             },
-            'frames': {
+            'task_extract_frames': {
                 'terms': {'field': '_cds.state.file_video_extract_frames'},
             },
             'created_by': created_by_me_aggs,
         },
         'filters': {
-            'status': terms_filter('_deposit.status'),
+            'project_status': terms_filter('_deposit.status'),
             'category': terms_filter('category.untouched'),
-            'transcode': terms_filter('_cds.state.file_transcode'),
-            'frames': terms_filter('_cds.state.file_video_extract_frames'),
+            'task_transcode': terms_filter('_cds.state.file_transcode'),
+            'task_extract_frames': terms_filter('_cds.state.file_video_extract_frames'),
             'created_by': terms_filter('_deposit.created_by'),
         },
     },
@@ -530,7 +565,7 @@ RECORD_VIDEOS_FACETS = {
             }
         },
         'filters': {
-            'keyword': terms_filter('keywords.name'),
+            'keyword': lowercase_filter('keywords.name'),
             'category': terms_filter('category.untouched'),
             'type': terms_filter('type.untouched'),
             'language': terms_filter('language'),
@@ -548,30 +583,45 @@ DEPOSIT_REST_SORT_OPTIONS = {
         bestmatch=dict(
             fields=['-_score'],
             title='Best match',
-            default_order='asc',
-            order=1
+            default_order='asc', order=1
         ),
-        mostrecent=dict(
-            fields=['-_updated'],
-            title='Newest',
+        mostrecent_created=dict(
+            fields=['-_created'],
+            title='Newest Created',
             default_order='asc', order=2,
-
         ),
-        oldest=dict(
-            fields=['_updated'],
-            title='Oldest',
+        oldest_created=dict(
+            fields=['_created'],
+            title='Oldest Created',
             default_order='asc', order=3,
+        ),
+        mostrecent_updated=dict(
+            fields=['-_updated'],
+            title='Newest Updated',
+            default_order='asc', order=4,
+        ),
+        oldest_updated=dict(
+            fields=['_updated'],
+            title='Oldest Updated',
+            default_order='asc', order=5,
         ),
         title_asc=dict(
             fields=['title.title.raw'],
             title='Title [Asc]',
-            default_order='asc', order=4,
+            default_order='asc', order=6,
         ),
         title_desc=dict(
             fields=['title.title.raw'],
             title='Title [Desc]',
-            default_order='desc', order=5,
+            default_order='desc', order=7,
         )),
+}
+
+DEPOSIT_REST_DEFAULT_SORT = {
+    'deposits-records-videos-project': {
+        'query': 'bestmatch',
+        'noquery': 'mostrecent_created',
+    }
 }
 
 # Update facets and sort options with deposit options
@@ -590,6 +640,9 @@ RECORDS_UI_DEFAULT_PERMISSION_FACTORY = \
 
 # Endpoint for the cds_recid provider
 RECORDS_ID_PROVIDER_ENDPOINT = None
+
+# User agent value to send in cds endpoints.
+RECORDS_ID_PROVIDER_AGENT = None
 
 ###############################################################################
 # Files
@@ -731,7 +784,9 @@ OAUTH2SERVER_SETTINGS_TEMPLATE = 'cds_theme/settings.html'
 ###############################################################################
 
 # The site name
-THEME_SITENAME = _('CERN Document Server')
+THEME_SITENAME = _(u'CDS Videos · CERN')
+THEME_SITEDESCRIPTION = _('CDS Videos is the CERN official repository to '
+                          'archive and disseminate videos.')
 # Default site URL (used only when not in a context - e.g. like celery tasks).
 THEME_SITEURL = "http://localhost:5000"
 # The theme logo.
@@ -797,11 +852,6 @@ VIDEOS_XROOTD_PREFIX = '{endpoint}{location}'.format(
     endpoint=VIDEOS_XROOTD_ENDPOINT, location=VIDEOS_LOCATION)
 # EOS path for video library `e-groups`
 VIDEOS_EOS_PATH_EGROUPS = [
-    "audiovisual-support@cern.ch",
-    "it-dep-uds-avc@cern.ch",
-    "editorial-group@cern.ch",
-    "hr-video-group@cern.ch",
-    "visualmedia-office@cern.ch",
     "vmo-restictedrights@cern.ch"
 ]
 """
@@ -898,7 +948,7 @@ DEPOSIT_REST_ENDPOINTS = dict(
                                  ':json_v1_search'),
         },
         list_route='/deposits/',
-        indexer_class=None,
+        indexer_class=CDSRecordIndexer,
         item_route='/deposits/<{0}:pid_value>'.format(_CDSDeposit_PID),
         file_list_route='/deposits/<{0}:pid_value>/files'.format(
             _CDSDeposit_PID),
@@ -950,7 +1000,7 @@ DEPOSIT_REST_ENDPOINTS = dict(
                                  ':json_v1_search'),
         },
         list_route='/deposits/project/',
-        indexer_class=None,
+        indexer_class=CDSRecordIndexer,
         item_route='/deposits/project/<{0}:pid_value>'.format(_Project_PID),
         file_list_route='/deposits/project/<{0}:pid_value>/files'.format(
             _Project_PID),
@@ -1001,7 +1051,7 @@ DEPOSIT_REST_ENDPOINTS = dict(
                                  ':json_v1_search'),
         },
         list_route='/deposits/video/',
-        indexer_class=None,
+        indexer_class=CDSRecordIndexer,
         item_route='/deposits/video/<{0}:pid_value>'.format(_Video_PID),
         file_list_route='/deposits/video/<{0}:pid_value>/files'.format(
             _Video_PID),
@@ -1094,11 +1144,6 @@ DEPOSIT_AVC_COPYRIGHT = {
     'holder': 'CERN',
     'url': 'http://copyright.web.cern.ch',
 }
-
-###############################################################################
-# SSE
-###############################################################################
-SSE_REDIS_URL = 'redis://localhost:6379/1'
 
 ###############################################################################
 # Keywords

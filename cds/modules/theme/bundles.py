@@ -42,6 +42,7 @@ css = Bundle(
     ),
     NpmBundle(
         'scss/cds.scss',
+        depends=('scss/*.scss', ),
         filters='node-scss,cleancssurl',
         npm={
             'bootstrap-sass': '~3.3.5',
@@ -73,6 +74,7 @@ js = NpmBundle(
         'node_modules/angular-ui-bootstrap/dist/ui-bootstrap.js',
         'node_modules/mousetrap/mousetrap.js',
         'js/cds/module.js',
+        'js/cds/suggestions.js',
         'js/main.js',
         filters='jsmin',
     ),

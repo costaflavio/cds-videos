@@ -55,6 +55,7 @@ from cds.modules.deposit.api import (record_build_url, video_build_url,
                                      video_resolver, Video,
                                      record_video_resolver,
                                      deposit_video_resolver)
+from cds.modules.deposit.indexer import CDSRecordIndexer
 from cds.modules.records.api import CDSVideosFilesIterator
 from cds.modules.webhooks.status import get_deposit_events, \
     get_tasks_status_by_task
@@ -415,7 +416,7 @@ def test_video_events_on_download_create(api_app, webhooks, db, api_project,
             access_token=access_token)
 
     with mock.patch('requests.get') as mock_request, \
-            mock.patch('invenio_indexer.api.RecordIndexer.bulk_index') \
+            mock.patch('invenio_indexer.tasks.index_record.delay') \
             as mock_indexer, \
             api_app.test_client() as client:
         file_size = 1024 * 1024
@@ -482,10 +483,9 @@ def test_video_events_on_workflow(webhooks, api_app, db, api_project, bucket,
     db.session.add(bucket)
 
     # registering receiver
-    sse_channel = 'mychannel'
     receiver_id = 'test_video_events_on_workflow'
     workflow_receiver_video_failing(
-        api_app, db, video_1, receiver_id=receiver_id, sse_channel=sse_channel)
+        api_app, db, video_1, receiver_id=receiver_id)
 
     with api_app.test_request_context():
         url = url_for(
@@ -619,6 +619,8 @@ def test_video_keywords(es, api_project, keyword_1, keyword_2, users):
         {'$ref': keyword_2.ref},
     ]
     video_1.commit()
+    db.session.commit()
+    CDSRecordIndexer().index(video_1)
     sleep(2)
 
     # check elasticsearch
@@ -632,9 +634,13 @@ def test_video_keywords(es, api_project, keyword_1, keyword_2, users):
     # try to remove a key
     video_1.remove_keyword(keyword_1)
     assert video_1['keywords'] == [
-        {'$ref': keyword_2.ref},
+        {
+            '$ref': keyword_2.ref
+        },
     ]
     video_1.commit()
+    db.session.commit()
+    CDSRecordIndexer().index(video_1)
     sleep(2)
 
     # check elasticsearch
@@ -669,8 +675,13 @@ def test_deposit_vtt_tags(api_app, db, api_project, users):
     video_1 = video_1.publish()
 
     # check tags
-    check_object_tags(obj, video_1, content_type='vtt', media_type='subtitle',
-                      context_type='subtitle', language='fr')
+    check_object_tags(
+        obj,
+        video_1,
+        content_type='vtt',
+        media_type='subtitle',
+        context_type='subtitle',
+        language='fr')
 
     # edit the video
     video_1 = video_1.edit()

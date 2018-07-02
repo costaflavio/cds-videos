@@ -1,6 +1,9 @@
 {%- extends config.RECORDS_UI_BASE_TEMPLATE %}
 {# Please keep the double `striptags`: it is needed to clean up encoded html entities contained in a few migrated old records #}
-{%- set title = record.title.title|striptags|striptags -%}
+
+{%- set title_prefix = record.title.title|striptags|striptags -%}
+{%- set description = description|default('')|striptags|striptags -%}
+
 {%- set type = 'video' if 'video-v1.0.0' in record['$schema'] else 'project'%}
 {%- block head_meta %}
     {{ super() }}
@@ -12,6 +15,9 @@
       <meta property="og:image" content="{{ url_for('invenio_records_ui.recid_files',
                                                     pid_value=pid.pid_value,
                                                     filename='frame-1.jpg', _external=True) }}" />
+    {% endif %}
+    {%- if type == 'project' %}
+      <meta name="robots" content="noindex" />
     {% endif %}
 {%- endblock head_meta %}
 {%- block javascript %}

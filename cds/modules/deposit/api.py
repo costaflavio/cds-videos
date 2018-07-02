@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of Invenio.
-# Copyright (C) 2016, 2017 CERN.
+# Copyright (C) 2016, 2017, 2018 CERN.
 #
 # Invenio is free software; you can redistribute it
 # and/or modify it under the terms of the GNU General Public License as
@@ -36,9 +36,12 @@ from functools import partial, wraps
 from os.path import splitext
 
 import arrow
+from celery import states
 from flask import current_app
 from flask_security import current_user
 from invenio_db import db
+from invenio_deposit.api import Deposit, has_status, preserve
+from invenio_deposit.utils import mark_as_action
 from invenio_files_rest.models import (Bucket, Location, MultipartObject,
                                        ObjectVersion, ObjectVersionTag,
                                        as_bucket, as_object_version)
@@ -52,16 +55,9 @@ from invenio_records_files.utils import sorted_files_from_bucket
 from invenio_sequencegenerator.api import Sequence
 from jsonschema.exceptions import ValidationError
 
-from invenio_deposit.api import Deposit, has_status, preserve
-from invenio_deposit.utils import mark_as_action
-
-from ..records.api import (
-    CDSFileObject,
-    CDSFilesIterator,
-    CDSVideosFilesIterator,
-    CDSRecord
-)
-from ..records.minters import is_local_doi, report_number_minter
+from ..records.api import (CDSFileObject, CDSFilesIterator, CDSRecord,
+                           CDSVideosFilesIterator)
+from ..records.minters import doi_minter, is_local_doi, report_number_minter
 from ..records.resolver import record_resolver
 from ..records.tasks import create_symlinks
 from ..records.validators import PartialDraft4Validator
@@ -99,9 +95,20 @@ def required(fields):
     return check
 
 
+class DummyIndexer(object):
+    """Define a dummy indexer to disable Deposit indexer."""
+
+    def index(self, *args, **kwargs):
+        pass
+
+    def delete(self, *args, **kwargs):
+        pass
+
+
 class CDSDeposit(Deposit):
     """Define API for changing deposit state."""
 
+    indexer = DummyIndexer()
     sequence_name = None
     """Sequence identifier (`None` if not applicable)."""
 
@@ -155,7 +162,7 @@ class CDSDeposit(Deposit):
             id_ = id_ or uuid.uuid4()
             cls.deposit_minter(id_, data)
         bucket = Bucket.create(location=Location.get_by_name(
-            kwargs.get('bucket_location', 'default')))
+                kwargs.get('bucket_location', 'default')))
         data['_buckets'] = {'deposit': str(bucket.id)}
         data.setdefault('_cds', {})
         data['_cds'].setdefault('state', {})
@@ -185,6 +192,12 @@ class CDSDeposit(Deposit):
     @preserve(result=False, fields=PRESERVE_FIELDS)
     def update(self, *args, **kwargs):
         """Update only drafts."""
+        def lower(l):
+            return [s.lower() for s in l]
+        # use always lower case in the access rights to prevent problems
+        if '_access' in self:
+            self['_access']['read'] = lower(self['_access'].get('read', []))
+            self['_access']['update'] = lower(self['_access'].get('update', []))
         super(CDSDeposit, self).update(*args, **kwargs)
 
     @preserve(result=False, fields=PRESERVE_FIELDS)
@@ -254,7 +267,7 @@ class CDSDeposit(Deposit):
             self['_cds']['state'] = self._current_tasks_status()
 
     def _current_tasks_status(self):
-        """."""
+        """Return default. Override method to handle different task status."""
         return {}
 
     @contextmanager
@@ -725,6 +738,12 @@ class Video(CDSDeposit):
 
     _schema = 'deposits/records/videos/video/video-v1.0.0.json'
 
+    _tasks_initial_state = {
+        'file_transcode': states.PENDING,
+        'file_video_extract_frames': states.PENDING,
+        'file_video_metadata_extraction': states.PENDING
+    }
+
     @classmethod
     def create(cls, data, id_=None, **kwargs):
         """Create a video deposit.
@@ -740,6 +759,9 @@ class Video(CDSDeposit):
             'year': str(datetime.date.today().year),
             'url': 'http://copyright.web.cern.ch',
         })
+        data.setdefault('_cds', {})
+        data['_cds'].setdefault('state', cls._tasks_initial_state)
+
         project = deposit_project_resolver(project_id)
         # create video
         video_new = super(Video, cls).create(data, id_=id_, **kwargs)
@@ -834,6 +856,12 @@ class Video(CDSDeposit):
         """Rename subtitles and publish."""
         self['_files'] = self.files.dumps()
         self._rename_subtitles()
+
+        from cds.modules.records.permissions import is_public
+        if is_public(self, 'read'):
+            # Mint the doi if necessary
+            doi_minter(record_uuid=self.id, data=self)
+
         return super(Video, self)._publish_edited()
 
     @mark_as_action

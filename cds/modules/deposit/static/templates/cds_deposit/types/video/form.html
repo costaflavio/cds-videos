@@ -43,7 +43,7 @@
             <i ng-hide="$ctrl.cdsDepositCtrl.depositStatusCurrent === $ctrl.cdsDepositCtrl.depositStatuses.FAILURE" class="fa fa-spinner fa-spin fa-2x fa-fw"></i>
             <i ng-show="$ctrl.cdsDepositCtrl.depositStatusCurrent === $ctrl.cdsDepositCtrl.depositStatuses.FAILURE" class="fa fa-remove fa-2x"></i>
           </div>
-          <iframe scrolling="no"  allowfullscreen="" ng-if="$ctrl.cdsDepositCtrl.previewer !== null" class="embed-responsive-item" src="{{ $ctrl.cdsDepositCtrl.previewer }}"></iframe>
+          <iframe scrolling="no"  allowfullscreen="" ng-if="$ctrl.cdsDepositCtrl.previewer !== null" class="embed-responsive-item" ng-src="{{ $ctrl.cdsDepositCtrl.previewer }}"></iframe>
         </div>
         <!-- Video preview -->
       </div>
@@ -121,7 +121,7 @@
             <i ng-hide="$ctrl.cdsDepositCtrl.depositStatusCurrent === $ctrl.cdsDepositCtrl.depositStatuses.FAILURE" class="fa fa-spinner fa-spin fa-2x fa-fw"></i>
             <i ng-show="$ctrl.cdsDepositCtrl.depositStatusCurrent === $ctrl.cdsDepositCtrl.depositStatuses.FAILURE" class="fa fa-remove fa-2x"></i>
           </div>
-          <iframe scrolling="no"  allowfullscreen="" ng-if="$ctrl.cdsDepositCtrl.previewer !== null" class="embed-responsive-item" src="{{ $ctrl.cdsDepositCtrl.previewer }}"></iframe>
+          <iframe scrolling="no"  allowfullscreen="" ng-if="$ctrl.cdsDepositCtrl.previewer !== null" class="embed-responsive-item" ng-src="{{ $ctrl.cdsDepositCtrl.previewer }}"></iframe>
         </div>
         <!-- Video preview -->
         <!-- Extra information -->
@@ -261,14 +261,14 @@
                    multiple
                    theme="bootstrap"
                    ng-disabled="(!$ctrl.cdsDepositCtrl.record.category && $ctrl.cdsDepositCtrl.cdsDepositsCtrl.accessRights.metadata.access.public === 'public') || $ctrl.cdsDepositCtrl.isPublished()"
-                   title="Search for names"
+                   title="Enter personal emails or e-group emails here"
                    on-select="$ctrl.onSelectValue($item, $model, '_access.read');$ctrl.selectedRestricted=$ctrl.cdsDepositCtrl.record._access.read"
                    on-remove="$ctrl.onRemoveValue($item, $model, '_access.read');$ctrl.selectedRestricted=$ctrl.cdsDepositCtrl.record._access.read"
                    ng-model="$ctrl.selectedRestricted"
                   >
                    <ui-select-match
                     ui-lock-choice="($ctrl.cdsDepositCtrl.cdsDepositsCtrl.accessRights.metadata.access.restricted || []).indexOf($item) > -1"
-                    placeholder="Search for names"
+                    placeholder="Enter personal emails or e-group emails here"
                   >
                     {{ $item.email || $item }}
                   </ui-select-match>

@@ -1,6 +1,6 @@
 /*
  * This file is part of Invenio.
- * Copyright (C) 2016, 2017 CERN.
+ * Copyright (C) 2016, 2017, 2018 CERN.
  *
  * Invenio is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -66,10 +66,11 @@ app.directive('cdsSearchResults', ['$sce', '$window', function($sce, $window) {
       try {
         var file = showGif ? scope.findGif(record) : scope.findPoster(record);
         return _.template(
-          "/api/iiif/v2/<%=bucket%>:<%=key%>/full/<%=size%>/0/default.<%=ext%>"
+          "/api/iiif/v2/<%=bucket%>:<%=version_id%>:<%=key%>/full/!<%=size%>/0/default.<%=ext%>"
         )({
           bucket: file.bucket_id,
           key: file.key,
+          version_id: file.version_id,
           size: size.join(','),
           ext: showGif ? 'gif' : 'png',
         });
@@ -210,22 +211,44 @@ app.filter('findMaster', function($filter) {
 // Find closest video resolution
 app.filter('findResolution', function($filter) {
   return function(record) {
-    height = record['tags']['height'];
-    selectedResolution = height.concat('p');
-    configuredResolutions = {
-      '240': '240p',
-      '360': '360p',
-      '480': '480p',
-      '720': 'HD 720',
-      '1080': 'HD 1080',
-      '2160': '2K',
-      '4096': '4K'
-    }
-    Object.keys(configuredResolutions).forEach(function(resolution) {
+    var height = parseInt(record['tags']['height'], 10);
+    var width = parseInt(record['tags']['width'], 10);
+
+    var selectedResolution = height.toString().concat('p');
+
+    var heightsToQualities = {
+      240: '240p',
+      360: '360p',
+      480: '480p',
+      720: '720p',
+      1024: '1024p',
+      1080: 'TBD',
+      2160: '4K',
+      4320: '8K'
+    };
+
+    Object.keys(heightsToQualities).forEach(function(resolution) {
       if (height >= resolution) {
-        selectedResolution = configuredResolutions[resolution]
+        selectedResolution = heightsToQualities[resolution];
       }
     });
+
+    if (selectedResolution === 'TBD') {
+      var widthToQualities = {
+        1920: '1080p',
+        2048: '2K'
+      };
+
+      // default case with first value
+      selectedResolution = widthToQualities[1920];
+
+      Object.keys(widthToQualities).forEach(function(resolution) {
+        if (width >= resolution) {
+          selectedResolution = widthToQualities[resolution];
+        }
+      });
+    }
+
     return selectedResolution;
   }
 });
@@ -239,7 +262,7 @@ app.filter('findPoster', function($filter) {
     } else {
       var masterFile = $filter('findMaster')(record);
       return _.find(masterFile['frame'], function (frame) {
-        return frame.key === 'frame-1.jpg'
+        return frame.key === 'frame-1.jpg';
       })
     }
   }
@@ -249,7 +272,7 @@ app.filter('findPoster', function($filter) {
 app.filter('findGif', function() {
   return function(masterFile) {
     return _.find(masterFile['frames-preview'], function (gif) {
-      return gif.key === 'frames.gif'
+      return gif.key === 'frames.gif';
     })
   }
 });
@@ -259,13 +282,15 @@ app.filter('iiif', function($filter) {
   return function(record, showGif, size) {
     try {
       var masterFile = $filter('findMaster')(record);
+      console.log(masterFile);
       var filterFun = showGif ? 'findGif' : 'findPoster';
       var filterArg = showGif ? masterFile : record
       return _.template(
-        "/api/iiif/v2/<%=bucket%>:<%=key%>/full/<%=size%>/0/default.<%=ext%>"
+        "/api/iiif/v2/<%=bucket%>:<%=version_id%>:<%=key%>/full/!<%=size%>/0/default.<%=ext%>"
       )({
         bucket: masterFile.bucket_id,
         key: $filter(filterFun)(filterArg).key,
+        version_id: masterFile.version_id,
         size: size.join(','),
         ext: showGif ? 'gif' : 'png',
       });
@@ -308,6 +333,53 @@ app.filter('groupDownloadable', function() {
       return _.get(e, 'tags.download')  === 'true' ?  'download' : 'additional';
     })
   });
+});
+
+// Sort video subformats descending by height
+app.filter('sortVideosDescending', function() {
+  return function(videos) {
+    return _.orderBy(videos, function(video) {
+      return parseInt(video.tags.height);
+    }, ['desc']);
+  }
+});
+
+/**
+ * Gett all files with types passed as argument
+ * @param {Array} files
+ * @param {Array} types the context type of a file
+ *
+ * ex:
+ * data.files | getFilesByType: ['subtitle']
+ * The function will filter all the files with the 'context_type' 'subtitle'
+ */
+app.filter('getFilesByType', function() {
+  return function(files, types) {
+    if (!_.isArray(files) || !_.isArray(types) || !types.length || !files.length) { return files; }
+
+    return files.filter(function(file) {
+      return types.indexOf(file.context_type) !== -1;
+    });
+  }
+});
+
+/**
+ * Gett all files except the the files with types passed as argument
+ * @param {Array} files
+ * @param {Array} types the context type of a file
+ *
+ * ex:
+ * data.files | getAllFilesExcept: ['subtitle']
+ * The function will filter all the files that have the 'context_type' not equal to 'subtitle'
+ */
+app.filter('getAllFilesExcept', function() {
+  return function(files, types) {
+    if (!_.isArray(files) || !_.isArray(types) || !types.length || !files.length) { return files; }
+
+    return files.filter(function(file) {
+      return types.indexOf(file.context_type) == -1;
+    });
+  }
 });
 
 // Transform the URL into absolute an URL
@@ -464,6 +536,13 @@ app.filter('replace', function () {
   }
 });
 
+// replace '_' with ' '
+app.filter('titlecase', function () {
+  return function (text, replaceText, replaceWith) {
+    return text ? String(text).replace(/_/g, ' ') : '';
+  }
+});
+
 app.provider('isoLanguages', function () {
   return {
     $get: function () {
@@ -473,6 +552,7 @@ app.provider('isoLanguages', function () {
         'bg': 'Bulgarian',
         'ca': 'Catalan',
         'ch': 'Chamorro',
+        'cs': 'Czech',
         'da': 'Danish',
         'de': 'German',
         'el': 'Greek',
@@ -481,12 +561,13 @@ app.provider('isoLanguages', function () {
         'es': 'Spanish',
         'fi': 'Finnish',
         'fr': 'French',
-        'hu': 'Hungarian',
         'hr': 'Croatian',
+        'hu': 'Hungarian',
         'it': 'Italian',
         'ja': 'Japanese',
         'ka': 'Georgian',
         'ko': 'Korean',
+        'nl': 'Dutch',
         'no': 'Norwegian',
         'pl': 'Polish',
         'pt': 'Portuguese',
@@ -503,3 +584,48 @@ app.provider('isoLanguages', function () {
     }
   }
 });
+
+// Directive for bootstrap popover to work inside ng-repeat
+app.directive('popover', function () {
+  return function (scope, element, attrs) {
+    element.find('a[rel=popover]').popover();
+  };
+});
+
+// Filter to format urls for download
+app.filter('download', function () {
+  return function(url) {
+    // Check if the url is invalid
+    if (!url) { return url; }
+
+    re = /([?&].*)=[^?&]+/;
+    // Check if the url has a querystring
+    if (url.match(re)) {
+      return url + '&download';
+    }
+
+    return url + '?download';
+  }
+});
+
+// filter for sharing on different social platforms
+// more details about how we build the URLs you can find on: https://github.com/bradvin/social-share-urls
+app.filter('assembleShareURL', ['$window', function($window) {
+  return function(record, platform) {
+    if (!record) { return; }
+
+    var title = encodeURIComponent(record.metadata.title.title);
+    var description = encodeURIComponent(record.metadata.description);
+    var currentPageAddress = encodeURIComponent($window.location.href);
+
+    var platformMapping = {
+      'facebook': 'https://www.facebook.com/sharer.php?u=' + currentPageAddress,
+      'twitter': 'https://twitter.com/intent/tweet?url=' + currentPageAddress + '&text=' + title + '&hashtags=cern',
+      'linkedin': 'https://www.linkedin.com/shareArticle?mini=true&url=' + currentPageAddress + '&title=' + title + '&summary=' + description + '&source=' + currentPageAddress,
+      'reddit': 'https://reddit.com/submit?url=' + currentPageAddress + '&title=' + title,
+      'email': 'mailto:?subject=' + title + '&body=' + description + '%0a' + currentPageAddress,
+    };
+
+    return platformMapping[platform];
+  };
+}]);

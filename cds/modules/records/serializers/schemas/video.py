@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of CERN Document Server.
-# Copyright (C) 2016, 2017 CERN.
+# Copyright (C) 2016, 2017, 2018 CERN.
 #
 # Invenio is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License as
@@ -120,6 +120,8 @@ class VideoSchema(StrictKeysSchema):
         ExternalSystemIdentifiersField, many=True)
     featured = fields.Boolean()
     internal_note = fields.Str()
+    internal_categories = fields.Raw()
+    Press = fields.List(fields.Str, many=True)
     keywords = fields.Nested(KeywordsSchema, many=True)
     language = fields.Str()
     license = fields.Nested(LicenseSchema, many=True)

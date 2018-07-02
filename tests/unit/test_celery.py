@@ -46,7 +46,9 @@ def test_celery_beat(app):
     beats = [task['schedule']
              for task in app.config['CELERYBEAT_SCHEDULE'].values()
              if isinstance(task['schedule'], crontab)]
-    assert len(beats) == 4
+
+    assert len(beats) == 6
+
     for beat in beats:
         [hour] = beat.hour
         assert hour <= 7

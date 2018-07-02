@@ -83,56 +83,57 @@ install_requires = [
     'Flask-Admin>=1.4.2',
     'Flask-BabelEx>=0.9.2',
     'Flask-Debugtoolbar>=0.10.0',
-    'Flask-IIIF>=0.3.1',
+    'Flask-IIIF>=0.5.0',
     'Flask-WTF>=0.13.1',
     'Flask>=0.11.1',
-    'cds-dojson>=0.7.0',
-    'cds-sorenson>=0.1.5',
-    'datacite>=0.2.1',
-    'dcxml>=0.1.0',
+    'cds-dojson>=0.9.0',
+    'cds-sorenson>=0.1.6',
+    'datacite>=1.0.1',
+    'dcxml>=0.1.1',
     'idutils>=0.2.3',
-    'invenio-access>=1.0.0b1',
-    'invenio-accounts>=1.0.0b12',
-    'invenio-admin>=1.0.0b4',
-    'invenio-assets>=1.0.0b7',
-    'invenio-base>=1.0.0b1',
-    'invenio-cache>=1.0.0b1',
-    'invenio-celery>=1.0.0b3',
+    'invenio-access>=1.0.0',
+    'invenio-accounts>=1.0.0',
+    'invenio-admin>=1.0.0',
+    'invenio-assets>=1.0.0',
+    'invenio-base>=1.0.1',
+    'invenio-cache>=1.0.0',
+    'invenio-celery>=1.0.0',
     'invenio-communities>=1.0.0a19',
-    'invenio-config>=1.0.0b3',
-    'invenio-db[postgresql,versioning]>=1.0.0b9',
+    'invenio-config>=1.0.0',
+    'invenio-db[postgresql,versioning]>=1.0.0',
+
     # FIXME topical branch
     #  'invenio-deposit>=1.0.0a8',
     # FIXME topical branch
     #  'invenio-files-rest>=1.0.0a18',
-    'invenio-formatter[badges]>=1.0.0b3',
-    # FIXME remove until proper integration
-    # 'invenio-i18n>=1.0.0b1',
-    'invenio-indexer>=1.0.0b1',
-    'invenio-jsonschemas>=1.0.0a7',
-    'invenio-logging>=1.0.0b3',
-    'invenio-mail>=1.0.0b1',
+    'invenio-formatter[badges]>=1.0.0',
+    'invenio-i18n>=1.0.0',
+    'invenio-iiif>=1.0.0a3',
+    'invenio-indexer>=1.0.0',
+    'invenio-jsonschemas>=1.0.0',
+    'invenio-logging>=1.0.0',
+    'invenio-mail>=1.0.0',
     # FIXME topical branch
     #  'invenio-migrator>=1.0.0a10',
-    'invenio-oaiserver>=1.0.0b2',
-    'invenio-oauth2server>=1.0.0b4',
-    'invenio-oauthclient>=1.0.0b5',
+    'invenio-oaiserver>=1.0.0',
+    'invenio-oauth2server>=1.0.0',
+    'invenio-oauthclient>=1.0.0',
+
     'invenio-opendefinition>=1.0.0a7',
     'invenio-pages>=1.0.0a4',
-    'invenio-pidstore>=1.0.0b2',
+    'invenio-pidstore>=1.0.0',
     'invenio-previewer>=1.0.0a11',
-    'invenio-query-parser>=0.6.0',
     'invenio-records-files>=1.0.0a10',
-    'invenio-records-rest>=1.0.0b6',
-    'invenio-records-ui>=1.0.0b2',
-    'invenio-records[postgresql]>=1.0.0b4',
-    'invenio-rest[cors]>=1.0.0b2',
-    'invenio-search-ui>=1.0.0a9',
-    'invenio-search[elasticsearch2]>=1.0.0b4',
+    'invenio-records-rest>=1.1.0',
+    'invenio-records-ui>=1.0.0',
+    'invenio-records[postgresql]>=1.0.0',
+    'invenio-rest>=1.0.0',
+    'invenio-search-ui>=1.0.1',
+    'invenio-search[elasticsearch2]>=1.0.0',
+
     'invenio-sequencegenerator>=1.0.0a2',
-    'invenio-sse>=1.0.0a2',
-    'invenio-theme>=1.0.0b4',
-    'invenio-userprofiles>=1.0.0b1',
+    'invenio-theme>=1.0.0',
+    'invenio-userprofiles>=1.0.0',
     # FIXME topical branch
     #  'invenio-webhooks>=1.0.0a4',
     'jsonref>=0.1',
@@ -145,6 +146,10 @@ install_requires = [
     'elasticsearch<3.0.0,>=2.0.0',      # FIXME: invenio-search
     'elasticsearch-dsl<3.0.0,>=2.0.0',  # FIXME: invenio-search
     'node-semver>=0.1.1,<0.2.0',        # FIXME: node-semver 0.2.0
+
+    'urllib3[secure]>=1.22',            # urllib3 doesn't install pyOpenSSl by default and thus the [secure] extra is needed
+    'SQLAlchemy-Continuum==1.3.4'       # FIXME: issue https://github.com/kvesteri/sqlalchemy-continuum/issues/188
+
 ]
 
 packages = find_packages()
@@ -174,6 +179,9 @@ setup(
         ],
         'flask.commands': [
             'subformats = cds.modules.maintenance.cli:subformats',
+
+            'videos = cds.modules.maintenance.cli:videos',
+
         ],
         'invenio_admin.views': [
             'cds_admin = '
@@ -195,7 +203,7 @@ setup(
         ],
         'invenio_base.api_apps': [
             'cds_deposit = cds.modules.deposit.ext:CDSDepositApp',
-            'cds_iiif = cds.modules.cds_iiif:CDSIIIF',
+            'cds_files_rest = cds.modules.files.ext:CDSFilesRestApp',
             'cds_xrootd = cds.modules.xrootd:CDSXRootD',
         ],
         'invenio_base.api_blueprints': [
@@ -212,7 +220,6 @@ setup(
             'cds_xrootd = cds.modules.xrootd:CDSXRootD',
             # FIXME should be move to invenio-webhooks
             'invenio_webhooks = invenio_webhooks:InvenioWebhooks',
-            'cds_iiif = cds.modules.cds_iiif:CDSIIIF',
         ],
         'invenio_base.blueprints': [
             'cds_deposit = cds.modules.deposit.views:blueprint',
@@ -265,9 +272,6 @@ setup(
             'cds_deposit_video = '
             'cds.modules.previewer.extensions.video:deposit_video',
             'cds_default = cds.modules.previewer.extensions.default',
-        ],
-        'invenio_sse.integrations': [
-            'deposit = invenio_sse.contrib.deposit.ext:InvenioSSEDeposit',
         ],
         'invenio_records.jsonresolver': [
             'keywords = cds.modules.records.jsonresolver.keywords',

@@ -1,4 +1,7 @@
 {%- extends 'cds_theme/page.html' %}
+
+{%- set title_prefix = '%s · %s'|format(_('Stats'), record.title.title|striptags|striptags) -%}
+
 {%- block css %}
   {{ super() }}
   {% assets "cds_record_stats_css" %}
@@ -31,10 +34,16 @@
 <div class='container'>
   <div class='row'>
     <div class='col-sm-12'>
-      <h2>Pageviews</h2>
-      <div class='pageviews'></div>
+      <h2>Page Views</h2>
+      <div class='pageviews'>
+        <i id="pageviews-loading-spinner" class="fa fa-spinner fa-spin"></i>
+        <p id="pageviews-error-message" style="display: none;">There was a problem while rendering pageviews data. We are investigating the issue.</p>
+      </div>
       <h2>Downloads</h2>
-      <div class='downloads'></div>
+      <div class='downloads'>
+        <i id="downloads-loading-spinner" class="fa fa-spinner fa-spin"></i>
+        <p id="downloads-error-message" style="display: none;">There was a problem while rendering downloads data. We are investigating the issue.</p>
+      </div>
     </div>
   </div>
 </div>

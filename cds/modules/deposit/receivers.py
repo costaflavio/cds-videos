@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 #
 # This file is part of Invenio.
-# Copyright (C) 2016 CERN.
+# Copyright (C) 2016, 2018 CERN.
 #
 # Invenio is free software; you can redistribute it
 # and/or modify it under the terms of the GNU General Public License as
@@ -22,7 +22,7 @@
 # waive the privileges and immunities granted to it by virtue of its status
 # as an Intergovernmental Organization or submit itself to any jurisdiction.
 
-"""Deposit API."""
+"""CDS Deposit receivers."""
 
 from __future__ import absolute_import, print_function
 
@@ -34,26 +34,13 @@ from invenio_deposit.receivers import \
 from invenio_jsonschemas import current_jsonschemas
 
 from .api import Project
+from .indexer import CDSRecordIndexer
 from .tasks import datacite_register
 
 
-def index_deposit_after_publish(sender, action=None, pid=None, deposit=None):
+def index_deposit_after_action(sender, action=None, pid=None, deposit=None):
     """Index the record after publishing."""
-    project_schema = current_jsonschemas.path_to_url(Project._schema)
-    if deposit['$schema'] == project_schema:
-        if action == 'publish':
-            # index videos (records)
-            pid_values = Project(data=deposit).video_ids
-            ids = [str(p.object_uuid)
-                   for p in PersistentIdentifier.query.filter(
-                PersistentIdentifier.pid_value.in_(pid_values)).all()]
-            # index project (record)
-            _, record = deposit.fetch_published()
-            ids.append(str(record.id))
-            RecordIndexer().bulk_index(iter(ids))
-    else:
-        original_index_deposit_after_publish(sender=sender, action=action,
-                                             pid=pid, deposit=deposit)
+    CDSRecordIndexer().index(deposit, action)
 
 
 def datacite_register_after_publish(sender, action=None, pid=None,
@@ -62,4 +49,6 @@ def datacite_register_after_publish(sender, action=None, pid=None,
     if action == "publish" and \
             current_app.config['DEPOSIT_DATACITE_MINTING_ENABLED']:
         recid_pid, record = deposit.fetch_published()
-        datacite_register.delay(recid_pid.pid_value, str(record.id))
+
+        if record.get('doi'):
+            datacite_register.delay(recid_pid.pid_value, str(record.id))
